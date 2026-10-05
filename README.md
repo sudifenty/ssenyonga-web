@@ -1,4 +1,4 @@
-# Cheap Motors — Dealership Website
+# Cars for Sale in Uganda — Dealership Website
 
 A car dealership website in ONE file: plain HTML, Tailwind CSS (CDN) and
 vanilla JavaScript. The live inventory is stored in a free **Supabase**
@@ -22,7 +22,7 @@ automatically (max 900px, JPEG, up to 6 per car).
    GitHub Desktop — it can't read ZIPs.
 2. Open **GitHub Desktop → File → Add Local Repository…** and select that folder.
    **Do not use "Clone"** — this repo is on your computer.
-3. Click **Publish repository**. Name it e.g. `cheap-motors`, and **UNcheck
+3. Click **Publish repository**. Name it e.g. `cars-for-sale-in-uganda`, and **UNcheck
    "Keep this code private"** (free GitHub Pages needs a public repository).
 4. Turn on the website: github.com → your repository → **Settings → Pages** →
    *Build and deployment* → **Source: Deploy from a branch** → **Branch: main**,
@@ -34,7 +34,7 @@ automatically (max 900px, JPEG, up to 6 per car).
 This is what makes added cars visible to every visitor. You do it **once**.
 
 1. Go to **supabase.com** → **Start your project** → sign up (free, no card
-   needed) → **New project**. Name it e.g. `cheap-motors`, pick any region,
+   needed) → **New project**. Name it e.g. `cars-for-sale-in-uganda`, pick any region,
    choose a database password (save it somewhere, you rarely need it).
 2. Wait 1–2 minutes while the project is created.
 3. In the left menu open **SQL Editor** → **New query**, paste **all** of the
@@ -64,7 +64,7 @@ This is what makes added cars visible to every visitor. You do it **once**.
 ### The setup SQL (copy the whole box)
 
 ```sql
--- Cheap Motors — one-time setup. Run in Supabase → SQL Editor → New query.
+-- Cars for Sale in Uganda — one-time setup. Run in Supabase → SQL Editor → New query.
 create table if not exists public.cars (
   id         text primary key,
   data       jsonb not null,
