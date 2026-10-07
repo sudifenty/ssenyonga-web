@@ -215,6 +215,15 @@
     .skel-cta{height:2.4rem;border-radius:.75rem;background:#232323;margin-top:1.1rem;animation:skelPulse 1.3s ease-in-out infinite}
     @keyframes skelPulse{0%,100%{opacity:.45}50%{opacity:.9}}
     .img-badge{position:absolute;right:.55rem;bottom:.55rem;background:rgba(0,0,0,.75);color:#fff;font-size:.68rem;font-weight:700;padding:.18rem .45rem;border-radius:.45rem}
+    /* ---- Sold cars on the customer site: shown, clearly marked, not removed ---- */
+    .is-sold{border-color:rgba(248,113,113,.38)}
+    .is-sold .card-photo{filter:grayscale(.85) brightness(.55)}
+    .is-sold:hover .card-photo{filter:grayscale(.55) brightness(.7)}
+    .is-sold .card-price{color:#8a8a8a;text-decoration:line-through;text-decoration-thickness:2px}
+    .sold-ribbon{position:absolute;top:.6rem;left:.6rem;display:inline-flex;align-items:center;gap:.3rem;background:#dc2626;color:#fff;font-size:.68rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:.22rem .6rem;border-radius:.45rem;box-shadow:0 2px 10px rgba(0,0,0,.45)}
+    .sold-stamp{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+    .sold-stamp span{border:3px solid rgba(248,113,113,.9);color:#f87171;font-size:1.05rem;font-weight:900;letter-spacing:.22em;text-transform:uppercase;padding:.2rem .85rem;border-radius:.5rem;transform:rotate(-12deg);background:rgba(0,0,0,.35)}
+    .sold-note{margin-top:.5rem;font-size:.75rem;font-weight:600;color:#f87171}
     .loc-chip{display:inline-flex;align-items:center;gap:.45rem;border:1px solid #333;border-radius:.75rem;background:#181818;color:#ccc;padding:.65rem 1.1rem;font-size:.85rem;font-weight:700;cursor:pointer;text-decoration:none;transition:border-color .15s ease,color .15s ease}
     .loc-chip:hover{border-color:rgba(212,175,55,.6);color:#fff}
     .footer-contact .loc-link{color:#999;font-weight:500}
@@ -1251,7 +1260,7 @@
          • loadCars() reads localStorage, applies the live search from
            #search and renders the matching cards into #cars
          • #count shows how many cars match ("Showing X cars available")
-         • Sold cars (status "sold" or sold: true) are always hidden
+         • Sold cars (status "sold" or sold: true) stay listed, marked "Sold"
          ================================================================ */
 
       var STORE_KEY = 'cheapMotors';
@@ -1370,9 +1379,11 @@
       var WA_NUMBER = '256753825453';              /* same number as calls */
 
       function waLink(car) {
-        var msg = car
-          ? 'Hi! I am interested in the ' + car.name + ' (' + fmtPrice(car.price) + ') on Cars for Sale in Uganda. Is it still available?'
-          : 'Hi! I would like to ask about the cars on Cars for Sale in Uganda.';
+        var msg = !car
+          ? 'Hi! I would like to ask about the cars on Cars for Sale in Uganda.'
+          : isSold(car)
+            ? 'Hi! I saw the ' + car.name + ' on Cars for Sale in Uganda is already sold. Do you have anything similar available?'
+            : 'Hi! I am interested in the ' + car.name + ' (' + fmtPrice(car.price) + ') on Cars for Sale in Uganda. Is it still available?';
         return 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg);
       }
 
@@ -1407,7 +1418,9 @@
 
       /* ---- Card template ------------------------------------------------ */
       function carCard(car, index, animate) {
-        var cls = 'card-hover group overflow-hidden rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5 transition duration-300';
+        var sold = isSold(car);
+        var cls = 'card-hover group overflow-hidden rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5 transition duration-300'
+                + (sold ? ' is-sold' : '');
         var style = '';
         if (animate) {                       // entrance animation on first paint only
           cls += ' fade-up';
@@ -1419,6 +1432,7 @@
             <img src="${esc(coverImage(car))}" alt="${esc(car.name)}" loading="lazy" data-action="photos" data-id="${esc(car.id)}"
                  class="card-photo h-40 w-full rounded-xl object-cover transition duration-500 group-hover:scale-105">
             ${carImages(car).length > 1 ? '<span class="img-badge">' + carImages(car).length + ' photos</span>' : ''}
+            ${sold ? '<span class="sold-ribbon">Sold</span><span class="sold-stamp" aria-hidden="true"><span>Sold</span></span>' : ''}
           </div>
           <div class="mt-4">
             <h3 class="text-lg font-bold text-white">${esc(car.name)}</h3>
@@ -1438,7 +1452,8 @@
             </div>
             <div class="mt-4 border-t border-[#262626] pt-4">
               <span class="block text-[10px] font-semibold uppercase tracking-widest text-[#777]">Price</span>
-              <p class="mt-1 text-2xl font-extrabold text-[#D4AF37]">${fmtPrice(car.price)}</p>
+              <p class="card-price mt-1 text-2xl font-extrabold text-[#D4AF37]">${fmtPrice(car.price)}</p>
+              ${sold ? '<p class="sold-note">This car has been sold — ask us about similar stock.</p>' : ''}
               <button type="button" data-action="details" data-id="${esc(car.id)}" aria-expanded="false"
                       class="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#D4AF37]/70 px-4 py-2 text-sm font-semibold text-[#D4AF37] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/10">
                 <span>View Details</span>
@@ -1478,16 +1493,23 @@
         var rawQuery = searchEl && searchEl.value ? searchEl.value.trim() : '';
         var query = rawQuery.toLowerCase();
 
+        /* Sold cars stay on the website — they are marked "Sold", not removed.
+           They are pushed to the end so available stock is seen first. */
         var visible = (remoteCars || readCars()).filter(function (c) {
-          return !isSold(c) && String(c.name || '').toLowerCase().includes(query);
+          return String(c.name || '').toLowerCase().includes(query);
         });
+        visible.sort(function (a, b) { return (isSold(a) ? 1 : 0) - (isSold(b) ? 1 : 0); });
+        var soldShown = visible.filter(isSold).length;
+        var availShown = visible.length - soldShown;
 
         carById = {};                               // lookup for the photo viewer
         visible.forEach(function (c) { carById[String(c.id)] = c; });
 
         if (countEl) {
-          countEl.innerHTML = 'Showing <span class="font-bold text-white">' + visible.length +
-            '</span> car' + (visible.length === 1 ? '' : 's') + ' available';
+          countEl.innerHTML = 'Showing <span class="font-bold text-white">' + availShown +
+            '</span> car' + (availShown === 1 ? '' : 's') + ' available' +
+            (soldShown ? ' <span class="text-[#555]">·</span> <span class="font-bold text-[#f87171]">' +
+              soldShown + '</span> sold' : '');
         }
 
         grid.innerHTML = visible.length
@@ -2111,7 +2133,9 @@
         return null;
       }
 
-      /* Mark Sold / Mark Available — flips the sold flag. Sold cars get an
+      /* Mark Sold / Mark Available — flips the sold flag. Sold cars remain
+         on the customer website with a Sold badge, greyed photo and a
+         struck-through price; they are sorted after available stock. An
          orange border + dimmed row here, and disappear from the customer
          site immediately. */
       function toggleSold(id) {
@@ -2122,7 +2146,7 @@
         car.status = nowSold ? 'sold' : 'available';   // keep both flags in sync
         save();
         toast(nowSold
-          ? car.name + ' marked as SOLD — it is now hidden from the customer site'
+          ? car.name + ' marked as SOLD — the website now shows it with a Sold badge'
           : car.name + ' is back on the market — visible on the customer site',
           nowSold ? 'info' : 'success');
       }
