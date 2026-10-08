@@ -832,8 +832,8 @@
         </div>
         <div class="flex items-center gap-2">
           <select id="visSite" class="inp" style="width:auto;padding-top:.45rem;padding-bottom:.45rem">
-            <option value="this" selected>This website</option>
-            <option value="all">Both websites</option>
+            <option value="all" selected>Both websites</option>
+            <option value="this">This website</option>
             <option value="other">cheap-motors.com</option>
           </select>
           <select id="visRange" class="inp" style="width:auto;padding-top:.45rem;padding-bottom:.45rem">
@@ -847,6 +847,11 @@
             Refresh
           </button>
         </div>
+      </div>
+
+      <div id="visDiag" class="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#262626] bg-[#151515] px-4 py-3 text-xs text-[#999]">
+        <span id="visDiagText">Checking…</span>
+        <button type="button" id="visTest" class="btn-ghost" style="padding:.3rem .7rem;font-size:.7rem">Record a test visit</button>
       </div>
 
       <div id="visState" class="mt-4 rounded-2xl border border-dashed border-[#2f2f2f] bg-[#151515] px-5 py-8 text-center text-sm text-[#888]">Loading visitor data…</div>
@@ -1221,6 +1226,7 @@
     function visPrettySource(s) {
       var v = String(s || 'direct').toLowerCase();
       if (v === 'direct') return 'Direct';
+      if (v === 'self-test') return 'Self test';
       if (/google\./.test(v)) return 'Google';
       if (/facebook\.|fb\./.test(v)) return 'Facebook';
       if (/instagram\./.test(v)) return 'Instagram';
@@ -1415,10 +1421,55 @@
         run(hasSiteCol);
       }
 
+      /* ---- Diagnostics: say plainly whether THIS browser is being counted,
+             and give a button that writes one real row end-to-end. -------- */
+      var diagEl = document.getElementById('visDiagText');
+      var testEl = document.getElementById('visTest');
+
+      function diag() {
+        if (!diagEl) return;
+        if (!sbConfigured()) { diagEl.textContent = 'Supabase is not configured — visits cannot be recorded.'; return; }
+        if (sbLSget(SB_SESSION_KEY)) {
+          diagEl.innerHTML = 'Your own visits are <b>not counted</b> in this browser, because you are signed in as the owner. ' +
+            'To see tracking work, open the website on your phone or in a private window — then press Refresh.';
+        } else {
+          diagEl.innerHTML = 'Tracking is <b>active</b> in this browser — this visit was counted.';
+        }
+      }
+
+      if (testEl) {
+        testEl.addEventListener('click', function () {
+          testEl.disabled = true;
+          var old = testEl.textContent;
+          testEl.textContent = 'Sending…';
+          fetch(SUPABASE_URL + '/rest/v1/' + VISITS_TABLE, {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, sbAnonHeaders()),
+            body: JSON.stringify([{ vid: 'test-' + Math.random().toString(36).slice(2, 8),
+                                    device: visDevice(navigator.userAgent || ''),
+                                    source: 'self-test', site: SITE_TAG }])
+          }).then(function (r) {
+            testEl.disabled = false; testEl.textContent = old;
+            if (r.ok) {
+              if (diagEl) diagEl.innerHTML = 'Test visit recorded (HTTP ' + r.status + '). It should appear below as <b>Self test</b>.';
+              setTimeout(load, 600);
+            } else {
+              r.text().then(function (t) {
+                if (diagEl) diagEl.textContent = 'Test visit FAILED — HTTP ' + r.status + '. ' + String(t).slice(0, 180);
+              });
+            }
+          }).catch(function (e) {
+            testEl.disabled = false; testEl.textContent = old;
+            if (diagEl) diagEl.textContent = 'Test visit FAILED — the request never reached Supabase (' + (e && e.message) + ').';
+          });
+        });
+      }
+
       if (refreshEl) refreshEl.addEventListener('click', load);
       if (rangeEl) rangeEl.addEventListener('change', load);
       if (siteEl) siteEl.addEventListener('change', load);
-      window.cmVisitorsRefresh = load;
+      window.cmVisitorsRefresh = function () { diag(); load(); };
+      diag();
     })();
 
     function sbSyncInventory(carsArr, currency, dashboard, prevMap) {
@@ -2977,9 +3028,9 @@
               toast('Could not reach Supabase — your changes are kept in this browser for now. Open the cloud settings and use "Sync now" when back online. (' + String(err && err.message || err) + ')', 'error');
             });
         }
-        if (sbValidSession()) { go(); return; }
+        if (sbValidSession()) { go(); if (window.cmVisitorsRefresh) window.cmVisitorsRefresh(); return; }
         if (!c.email || !c.password) { refreshCloudPill(); if (manual) openSbModal(); return; }
-        sbSignIn(c.email, c.password).then(go).catch(function (err) {
+        sbSignIn(c.email, c.password).then(function () { go(); if (window.cmVisitorsRefresh) window.cmVisitorsRefresh(); }).catch(function (err) {
           refreshCloudPill();
           toast('Sign-in failed — check your email and password in the cloud settings. (' + String(err && err.message || err) + ')', 'error');
           if (manual) openSbModal();
@@ -3047,6 +3098,7 @@
               refreshCloudPill();
               closeSbModal();
               syncNow(true);                        // push everything right away
+              if (window.cmVisitorsRefresh) window.cmVisitorsRefresh();   // panel can read now
             })
             .catch(function (err) {
               refreshCloudPill();
