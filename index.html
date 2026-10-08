@@ -224,6 +224,22 @@
     .sold-stamp{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
     .sold-stamp span{border:3px solid rgba(248,113,113,.9);color:#f87171;font-size:1.05rem;font-weight:900;letter-spacing:.22em;text-transform:uppercase;padding:.2rem .85rem;border-radius:.5rem;transform:rotate(-12deg);background:rgba(0,0,0,.35)}
     .sold-note{margin-top:.5rem;font-size:.75rem;font-weight:600;color:#f87171}
+
+    /* ---- Visitor analytics panel (owner dashboard) ---- */
+    .vis-row{display:flex;align-items:center;gap:.6rem}
+    .vis-label{flex:0 0 7.5rem;font-size:.8125rem;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .vis-track{flex:1;height:.5rem;border-radius:9999px;background:#242424;overflow:hidden}
+    .vis-fill{display:block;height:100%;border-radius:9999px;transition:width .3s ease}
+    .vis-num{flex:0 0 2.2rem;text-align:right;font-size:.8125rem;font-weight:700;color:#fff}
+    .vis-chart{display:flex;align-items:flex-end;gap:.35rem;height:9rem}
+    .vis-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:.25rem}
+    .vis-colnum{font-size:.625rem;font-weight:700;color:#999;height:.9rem}
+    .vis-colbar{display:block;width:100%;max-width:2.2rem;border-radius:.3rem .3rem 0 0;background:linear-gradient(180deg,#D4AF37,rgba(212,175,55,.35))}
+    .vis-colday{font-size:.625rem;color:#666}
+    .vis-table{width:100%;border-collapse:collapse;font-size:.8125rem}
+    .vis-table th{text-align:left;padding:.45rem .6rem;color:#777;font-size:.6875rem;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #262626;white-space:nowrap}
+    .vis-table td{padding:.45rem .6rem;color:#ccc;border-bottom:1px solid #1f1f1f;white-space:nowrap}
+    .vis-table tr:last-child td{border-bottom:0}
     .loc-chip{display:inline-flex;align-items:center;gap:.45rem;border:1px solid #333;border-radius:.75rem;background:#181818;color:#ccc;padding:.65rem 1.1rem;font-size:.85rem;font-weight:700;cursor:pointer;text-decoration:none;transition:border-color .15s ease,color .15s ease}
     .loc-chip:hover{border-color:rgba(212,175,55,.6);color:#fff}
     .footer-contact .loc-link{color:#999;font-weight:500}
@@ -805,6 +821,81 @@
       </div>
     </section>
 
+
+    <!-- ===================== WEBSITE VISITORS ===================== -->
+    <section id="visitorPanel" class="mt-8" aria-label="Website visitors">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-white">Website Visitors</h2>
+          <p class="mt-0.5 text-sm text-[#777]">Who has been looking at your cars.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="visRange" class="inp" style="width:auto;padding-top:.45rem;padding-bottom:.45rem">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="0">All time</option>
+          </select>
+          <button type="button" id="visRefresh" class="btn-ghost">
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div id="visState" class="mt-4 rounded-2xl border border-dashed border-[#2f2f2f] bg-[#151515] px-5 py-8 text-center text-sm text-[#888]">Loading visitor data…</div>
+
+      <div id="visBody" class="hidden">
+        <div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div class="rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+            <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Total Views</span>
+            <div id="visTotal" class="mt-3 text-3xl font-extrabold text-white">0</div>
+          </div>
+          <div class="rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+            <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Unique Visitors</span>
+            <div id="visUnique" class="mt-3 text-3xl font-extrabold text-[#D4AF37]">0</div>
+          </div>
+          <div class="rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+            <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Today</span>
+            <div id="visToday" class="mt-3 text-3xl font-extrabold text-[#4ade80]">0</div>
+          </div>
+          <div class="rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+            <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Last 7 Days</span>
+            <div id="vis7" class="mt-3 text-3xl font-extrabold text-white">0</div>
+          </div>
+        </div>
+
+        <div class="mt-4 rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+          <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Views per day</span>
+          <div id="visChart" class="vis-chart mt-4" role="img" aria-label="Views per day"></div>
+        </div>
+
+        <div class="mt-4 grid gap-4 lg:grid-cols-3">
+          <div class="rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+            <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Where they came from</span>
+            <div id="visSources" class="mt-3 space-y-2"></div>
+          </div>
+          <div class="rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+            <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Device</span>
+            <div id="visDevices" class="mt-3 space-y-2"></div>
+          </div>
+          <div class="rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+            <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Busiest hours</span>
+            <div id="visHours" class="mt-3 space-y-2"></div>
+          </div>
+        </div>
+
+        <div class="mt-4 rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
+          <span class="text-xs font-semibold uppercase tracking-widest text-[#777]">Recent visits</span>
+          <div id="visRecent" class="mt-3 overflow-x-auto"></div>
+        </div>
+
+        <p class="mt-3 text-xs leading-relaxed text-[#666]">
+          Counts anonymous visits only — no names, emails or exact locations are collected or stored.
+        </p>
+      </div>
+    </section>
+
     <!-- ======================== ADD NEW CAR ========================= -->
     <section class="mt-8" aria-label="Add a new car">
       <form id="addCarForm" novalidate class="rounded-2xl border border-[#262626] bg-[#1a1a1a] p-5">
@@ -1092,6 +1183,255 @@
     /* Push the inventory to Supabase. Only changed/new cars are uploaded and
        cars removed here are deleted there, so a normal save is one small
        request even with a big inventory. */
+
+    /* =====================================================================
+       VISITOR TRACKING
+       Records one anonymous row per page view in the Supabase table
+       "page_views" (see analytics-setup.sql). No names, no emails, no IP
+       addresses, no precise location — just enough to tell the owner how
+       many people looked at the cars and roughly where they came from.
+       Silently does nothing if Supabase is not configured or the table has
+       not been created yet.
+       ===================================================================== */
+    var VIEWS_TABLE = 'page_views';
+    var SITE_TAG = 'cars-for-sale-in-uganda';
+
+    function visRandomId() {
+      try {
+        if (window.crypto && crypto.getRandomValues) {
+          var a = new Uint8Array(8); crypto.getRandomValues(a);
+          return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+        }
+      } catch (err) {}
+      return Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+    }
+    function visIdFrom(store, key) {
+      try {
+        var v = store.getItem(key);
+        if (!v) { v = visRandomId(); store.setItem(key, v); }
+        return v;
+      } catch (err) { return 'anon'; }
+    }
+    function visBrowser(ua) {
+      if (/edg\//i.test(ua)) return 'Edge';
+      if (/opr\/|opera/i.test(ua)) return 'Opera';
+      if (/samsungbrowser/i.test(ua)) return 'Samsung';
+      if (/firefox|fxios/i.test(ua)) return 'Firefox';
+      if (/chrome|crios/i.test(ua)) return 'Chrome';
+      if (/safari/i.test(ua)) return 'Safari';
+      return 'Other';
+    }
+    function visDevice(ua) {
+      if (/ipad|tablet|playbook|silk/i.test(ua)) return 'Tablet';
+      if (/mobi|android|iphone|ipod/i.test(ua)) return 'Mobile';
+      return 'Desktop';
+    }
+    function visSource(ref) {
+      if (!ref) return 'Direct';
+      try {
+        var hostName = new URL(ref).hostname.replace(/^www\./, '');
+        if (hostName === location.hostname) return '';          // internal click, skip
+        if (/google\./i.test(hostName)) return 'Google';
+        if (/facebook\.|fb\./i.test(hostName)) return 'Facebook';
+        if (/instagram\./i.test(hostName)) return 'Instagram';
+        if (/t\.co$|twitter\.|x\.com$/i.test(hostName)) return 'X / Twitter';
+        if (/whatsapp|wa\.me/i.test(hostName)) return 'WhatsApp';
+        if (/tiktok\./i.test(hostName)) return 'TikTok';
+        if (/youtube\.|youtu\.be/i.test(hostName)) return 'YouTube';
+        if (/bing\./i.test(hostName)) return 'Bing';
+        return hostName;
+      } catch (err) { return 'Direct'; }
+    }
+
+    (function trackVisit() {
+      if (!sbConfigured() || typeof fetch !== 'function') return;
+      try {
+        if (sbValidSession()) return;                  // don't count the owner
+        if (sessionStorage.getItem('cmViewSent')) return;   // once per session
+        sessionStorage.setItem('cmViewSent', '1');
+      } catch (err) {}
+
+      var ua = navigator.userAgent || '';
+      var row = {
+        site: SITE_TAG,
+        visitor: visIdFrom(localStorage, 'cmVisitorId'),
+        session: visIdFrom(sessionStorage, 'cmSessionId'),
+        path: (location.pathname || '/') + (location.search || ''),
+        ref: visSource(document.referrer || ''),
+        device: visDevice(ua),
+        browser: visBrowser(ua),
+        lang: (navigator.language || '').slice(0, 12),
+        tz: ''
+      };
+      try { row.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (err) {}
+
+      function send() {
+        fetch(SUPABASE_URL + '/rest/v1/' + VIEWS_TABLE, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(row),
+          keepalive: true
+        }).catch(function () {});     // never let tracking break the page
+      }
+      if (document.readyState === 'complete') send();
+      else window.addEventListener('load', function () { setTimeout(send, 400); });
+    })();
+
+
+    /* =====================================================================
+       VISITOR DASHBOARD
+       Reads page_views back for the owner. Reading requires the owner's
+       Supabase account (RLS allows select only to authenticated), so this
+       panel asks the owner to sign in before it shows anything.
+       ===================================================================== */
+    (function visitorDashboard() {
+      var stateEl = document.getElementById('visState');
+      var bodyEl = document.getElementById('visBody');
+      if (!stateEl || !bodyEl) return;
+
+      var rangeEl = document.getElementById('visRange');
+      var refreshEl = document.getElementById('visRefresh');
+      var busy = false;
+
+      function show(msg) { stateEl.textContent = msg; stateEl.classList.remove('hidden'); bodyEl.classList.add('hidden'); }
+      function showHTML(html) { stateEl.innerHTML = html; stateEl.classList.remove('hidden'); bodyEl.classList.add('hidden'); }
+      function esc2(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+      function bars(pairs, colour) {
+        if (!pairs.length) return '<p class="text-sm text-[#666]">No data yet.</p>';
+        var max = Math.max.apply(null, pairs.map(function (p) { return p[1]; })) || 1;
+        return pairs.map(function (p) {
+          var pct = Math.round(p[1] / max * 100);
+          return '<div class="vis-row"><span class="vis-label">' + esc2(p[0]) + '</span>' +
+                 '<span class="vis-track"><span class="vis-fill" style="width:' + pct + '%;background:' + colour + '"></span></span>' +
+                 '<span class="vis-num">' + p[1] + '</span></div>';
+        }).join('');
+      }
+      function topPairs(rows, key, limit) {
+        var counts = {};
+        rows.forEach(function (r) {
+          var v = (r[key] || '').trim() || 'Unknown';
+          counts[v] = (counts[v] || 0) + 1;
+        });
+        return Object.keys(counts).map(function (k) { return [k, counts[k]]; })
+          .sort(function (a, b) { return b[1] - a[1]; }).slice(0, limit || 6);
+      }
+      function ago(d) {
+        var s = Math.floor((Date.now() - d.getTime()) / 1000);
+        if (s < 60) return 'just now';
+        if (s < 3600) return Math.floor(s / 60) + ' min ago';
+        if (s < 86400) return Math.floor(s / 3600) + ' hr ago';
+        var days = Math.floor(s / 86400);
+        if (days < 30) return days + (days === 1 ? ' day ago' : ' days ago');
+        return d.toLocaleDateString();
+      }
+
+      function paint(rows) {
+        var now = new Date();
+        var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        var weekAgo = now.getTime() - 7 * 86400000;
+
+        var dated = rows.map(function (r) { var t = new Date(r.ts); return { r: r, t: t, ms: t.getTime() }; })
+                        .filter(function (x) { return !isNaN(x.ms); });
+
+        document.getElementById('visTotal').textContent = dated.length;
+        var uniq = {}; dated.forEach(function (x) { uniq[x.r.visitor || x.r.session || x.r.id] = 1; });
+        document.getElementById('visUnique').textContent = Object.keys(uniq).length;
+        document.getElementById('visToday').textContent = dated.filter(function (x) { return x.ms >= startOfToday; }).length;
+        document.getElementById('vis7').textContent = dated.filter(function (x) { return x.ms >= weekAgo; }).length;
+
+        /* ---- views per day, last 14 days ---- */
+        var days = [], i;
+        for (i = 13; i >= 0; i--) {
+          var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+          days.push({ d: d, start: d.getTime(), end: d.getTime() + 86400000, n: 0 });
+        }
+        dated.forEach(function (x) {
+          for (var k = 0; k < days.length; k++) {
+            if (x.ms >= days[k].start && x.ms < days[k].end) { days[k].n++; break; }
+          }
+        });
+        var peak = Math.max.apply(null, days.map(function (x) { return x.n; })) || 1;
+        document.getElementById('visChart').innerHTML = days.map(function (x) {
+          var h = Math.max(3, Math.round(x.n / peak * 100));
+          var label = x.d.getDate() + '/' + (x.d.getMonth() + 1);
+          return '<div class="vis-col" title="' + label + ': ' + x.n + ' view' + (x.n === 1 ? '' : 's') + '">' +
+                 '<span class="vis-colnum">' + (x.n || '') + '</span>' +
+                 '<span class="vis-colbar" style="height:' + h + '%"></span>' +
+                 '<span class="vis-colday">' + x.d.getDate() + '</span></div>';
+        }).join('');
+
+        document.getElementById('visSources').innerHTML = bars(topPairs(rows, 'ref', 6), '#D4AF37');
+        document.getElementById('visDevices').innerHTML = bars(topPairs(rows, 'device', 4), '#4ade80');
+
+        var hourCounts = {};
+        dated.forEach(function (x) { var hh = x.t.getHours(); hourCounts[hh] = (hourCounts[hh] || 0) + 1; });
+        var hourPairs = Object.keys(hourCounts).map(function (k) {
+          var hh = Number(k);
+          return [(hh < 10 ? '0' : '') + hh + ':00', hourCounts[k]];
+        }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
+        document.getElementById('visHours').innerHTML = bars(hourPairs, '#60a5fa');
+
+        /* ---- recent visits ---- */
+        var recent = dated.slice(0, 25);
+        document.getElementById('visRecent').innerHTML = recent.length
+          ? '<table class="vis-table"><thead><tr><th>When</th><th>Source</th><th>Device</th><th>Browser</th><th>Page</th></tr></thead><tbody>' +
+            recent.map(function (x) {
+              return '<tr><td>' + esc2(ago(x.t)) + '</td><td>' + esc2(x.r.ref || 'Direct') + '</td><td>' +
+                     esc2(x.r.device || '—') + '</td><td>' + esc2(x.r.browser || '—') + '</td><td>' +
+                     esc2(x.r.path || '/') + '</td></tr>';
+            }).join('') + '</tbody></table>'
+          : '<p class="text-sm text-[#666]">No visits recorded yet.</p>';
+
+        stateEl.classList.add('hidden');
+        bodyEl.classList.remove('hidden');
+      }
+
+      function load() {
+        if (busy) return;
+        if (!sbConfigured()) { show('Supabase is not configured, so visits cannot be recorded.'); return; }
+        if (!sbValidSession()) {
+          showHTML('Sign in with your owner account (the cloud button at the top) to see who has visited your website.');
+          return;
+        }
+        busy = true;
+        show('Loading visitor data…');
+
+        var days = rangeEl ? Number(rangeEl.value) : 30;
+        var url = SUPABASE_URL + '/rest/v1/' + VIEWS_TABLE +
+                  '?select=id,ts,visitor,session,path,ref,device,browser&order=ts.desc&limit=5000';
+        if (days > 0) {
+          url += '&ts=gte.' + new Date(Date.now() - days * 86400000).toISOString();
+        }
+        sbAuthedFetch(url, { headers: { 'Accept': 'application/json' } })
+          .then(function (res) {
+            busy = false;
+            if (!res) { show('Could not reach the cloud. Check your connection and try Refresh.'); return null; }
+            if (res.status === 404 || res.status === 400) {
+              showHTML('Visitor tracking is not set up yet.<br><span class="text-[#888]">Open Supabase → SQL Editor and run the script in <b>analytics-setup.sql</b> from your repository, then press Refresh.</span>');
+              return null;
+            }
+            if (res.status === 401 || res.status === 403) {
+              show('Your owner session has expired. Sign in again with the cloud button, then press Refresh.');
+              return null;
+            }
+            if (!res.ok) { show('Could not load visitor data (error ' + res.status + ').'); return null; }
+            return res.json();
+          })
+          .then(function (rows) { if (rows) paint(rows); })
+          .catch(function () { busy = false; show('Could not load visitor data. Press Refresh to try again.'); });
+      }
+
+      if (refreshEl) refreshEl.addEventListener('click', load);
+      if (rangeEl) rangeEl.addEventListener('change', load);
+      window.cmVisitorsRefresh = load;
+    })();
+
     function sbSyncInventory(carsArr, currency, dashboard, prevMap) {
       prevMap = prevMap || {};
       var changed = [];
@@ -2857,7 +3197,7 @@
 
       gateForm.addEventListener('submit', function (e) {
         e.preventDefault();
-        if (gateInput.value === CM_PASSCODE) { closeGate(); showAdmin(); if (window.cmCloudCheck) window.cmCloudCheck(); if (window.cmDashboardRefresh) window.cmDashboardRefresh(); }
+        if (gateInput.value === CM_PASSCODE) { closeGate(); showAdmin(); if (window.cmCloudCheck) window.cmCloudCheck(); if (window.cmDashboardRefresh) window.cmDashboardRefresh(); if (window.cmVisitorsRefresh) window.cmVisitorsRefresh(); }
         else { gateError.hidden = false; gateInput.value = ''; gateInput.focus(); }
       });
       document.getElementById('gateCancel').addEventListener('click', closeGate);
