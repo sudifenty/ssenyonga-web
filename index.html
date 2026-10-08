@@ -829,13 +829,13 @@
         <div>
           <h2 class="text-lg font-bold text-white">Website Visitors</h2>
           <p class="mt-0.5 text-sm text-[#777]">Who has been looking at your cars.</p>
-          <p id="visScope" class="mt-1 text-xs font-semibold text-[#D4AF37]">Showing: this website only</p>
+          <p id="visScope" class="mt-1 text-xs font-semibold text-[#D4AF37]">Showing: both websites</p>
         </div>
         <div class="flex items-center gap-2">
           <select id="visSite" class="inp" style="width:auto;padding-top:.45rem;padding-bottom:.45rem">
-            <option value="this" selected>This website only</option>
+            <option value="all" selected>Both websites</option>
+            <option value="this">This website only</option>
             <option value="other">cheap-motors.com only</option>
-            <option value="all">Both websites combined</option>
           </select>
           <select id="visRange" class="inp" style="width:auto;padding-top:.45rem;padding-bottom:.45rem">
             <option value="7">Last 7 days</option>
@@ -1283,6 +1283,14 @@
 
       var rangeEl = document.getElementById('visRange');
       var siteEl = document.getElementById('visSite');
+      /* Remember the owner's choice so the panel never resets itself. */
+      var VIS_SCOPE_KEY = 'cmVisitorScope', VIS_RANGE_KEY = 'cmVisitorRange';
+      try {
+        var savedScope = localStorage.getItem(VIS_SCOPE_KEY);
+        if (savedScope && siteEl) siteEl.value = savedScope;
+        var savedRange = localStorage.getItem(VIS_RANGE_KEY);
+        if (savedRange && rangeEl) rangeEl.value = savedRange;
+      } catch (err) {}
       var refreshEl = document.getElementById('visRefresh');
       var busy = false, hasSiteCol = true;
 
@@ -1329,7 +1337,8 @@
             ? 'Showing: this website only (' + mine + ' view' + (mine === 1 ? '' : 's') + ')'
             : mode === 'other'
               ? 'Showing: cheap-motors.com only (' + rows.length + ' view' + (rows.length === 1 ? '' : 's') + ')'
-              : 'Showing: both websites — ' + mine + ' from this site, ' + theirs + ' from cheap-motors.com';
+              : 'Showing: both websites — ' + rows.length + ' views total (' + mine +
+                ' from this website, ' + theirs + ' from cheap-motors.com)';
         }
         var now = new Date();
         var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -1478,8 +1487,14 @@
       }
 
       if (refreshEl) refreshEl.addEventListener('click', load);
-      if (rangeEl) rangeEl.addEventListener('change', load);
-      if (siteEl) siteEl.addEventListener('change', load);
+      if (rangeEl) rangeEl.addEventListener('change', function () {
+        try { localStorage.setItem(VIS_RANGE_KEY, rangeEl.value); } catch (err) {}
+        load();
+      });
+      if (siteEl) siteEl.addEventListener('change', function () {
+        try { localStorage.setItem(VIS_SCOPE_KEY, siteEl.value); } catch (err) {}
+        load();
+      });
       window.cmVisitorsRefresh = function () { diag(); load(); };
       diag();
     })();
