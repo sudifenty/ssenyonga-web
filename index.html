@@ -830,6 +830,11 @@
           <p class="mt-0.5 text-sm text-[#777]">Who has been looking at your cars.</p>
         </div>
         <div class="flex items-center gap-2">
+          <select id="visSite" class="inp" style="width:auto;padding-top:.45rem;padding-bottom:.45rem">
+            <option value="this" selected>This website</option>
+            <option value="all">Both websites</option>
+            <option value="other">cheap-motors.com</option>
+          </select>
           <select id="visRange" class="inp" style="width:auto;padding-top:.45rem;padding-bottom:.45rem">
             <option value="7">Last 7 days</option>
             <option value="30" selected>Last 30 days</option>
@@ -1185,109 +1190,83 @@
        request even with a big inventory. */
 
     /* =====================================================================
-       VISITOR TRACKING
-       Records one anonymous row per page view in the Supabase table
-       "page_views" (see analytics-setup.sql). No names, no emails, no IP
-       addresses, no precise location — just enough to tell the owner how
-       many people looked at the cars and roughly where they came from.
-       Silently does nothing if Supabase is not configured or the table has
-       not been created yet.
+       VISITOR TRACKING  (shared with cheap-motors.com)
+       Both websites write to the SAME "visits" table in Supabase, using the
+       same columns and the same device/source wording, so the numbers from
+       the two sites line up. An optional extra column "site" tells them
+       apart; if that column does not exist the insert is retried without
+       it, so this keeps working against the original table.
+       No names, emails, IP addresses or precise locations are stored.
        ===================================================================== */
-    var VIEWS_TABLE = 'page_views';
+    var VISITS_TABLE = 'visits';
     var SITE_TAG = 'cars-for-sale-in-uganda';
 
-    function visRandomId() {
-      try {
-        if (window.crypto && crypto.getRandomValues) {
-          var a = new Uint8Array(8); crypto.getRandomValues(a);
-          return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
-        }
-      } catch (err) {}
-      return Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
-    }
-    function visIdFrom(store, key) {
-      try {
-        var v = store.getItem(key);
-        if (!v) { v = visRandomId(); store.setItem(key, v); }
-        return v;
-      } catch (err) { return 'anon'; }
-    }
-    function visBrowser(ua) {
-      if (/edg\//i.test(ua)) return 'Edge';
-      if (/opr\/|opera/i.test(ua)) return 'Opera';
-      if (/samsungbrowser/i.test(ua)) return 'Samsung';
-      if (/firefox|fxios/i.test(ua)) return 'Firefox';
-      if (/chrome|crios/i.test(ua)) return 'Chrome';
-      if (/safari/i.test(ua)) return 'Safari';
-      return 'Other';
-    }
+    /* Same wording as the live site so the two sets of data merge cleanly. */
     function visDevice(ua) {
-      if (/ipad|tablet|playbook|silk/i.test(ua)) return 'Tablet';
-      if (/mobi|android|iphone|ipod/i.test(ua)) return 'Mobile';
-      return 'Desktop';
+      return /iPad|Tablet/i.test(ua) ? 'Tablet'
+        : /Android/i.test(ua) ? 'Android phone'
+        : /iPhone|iPod/i.test(ua) ? 'iPhone'
+        : /Windows/i.test(ua) ? 'Windows PC'
+        : /Macintosh|Mac OS X/i.test(ua) ? 'Mac'
+        : 'Visitor';
     }
-    function visSource(ref) {
-      if (!ref) return 'Direct';
+    function visSourceHost() {
       try {
-        var hostName = new URL(ref).hostname.replace(/^www\./, '');
-        if (hostName === location.hostname) return '';          // internal click, skip
-        if (/google\./i.test(hostName)) return 'Google';
-        if (/facebook\.|fb\./i.test(hostName)) return 'Facebook';
-        if (/instagram\./i.test(hostName)) return 'Instagram';
-        if (/t\.co$|twitter\.|x\.com$/i.test(hostName)) return 'X / Twitter';
-        if (/whatsapp|wa\.me/i.test(hostName)) return 'WhatsApp';
-        if (/tiktok\./i.test(hostName)) return 'TikTok';
-        if (/youtube\.|youtu\.be/i.test(hostName)) return 'YouTube';
-        if (/bing\./i.test(hostName)) return 'Bing';
-        return hostName;
-      } catch (err) { return 'Direct'; }
+        if (document.referrer) return new URL(document.referrer).hostname.replace(/^www\./, '');
+      } catch (err) {}
+      return 'direct';
+    }
+    /* Pretty label for the dashboard only — the stored value stays raw. */
+    function visPrettySource(s) {
+      var v = String(s || 'direct').toLowerCase();
+      if (v === 'direct') return 'Direct';
+      if (/google\./.test(v)) return 'Google';
+      if (/facebook\.|fb\./.test(v)) return 'Facebook';
+      if (/instagram\./.test(v)) return 'Instagram';
+      if (/t\.co$|twitter\.|x\.com$/.test(v)) return 'X / Twitter';
+      if (/whatsapp|wa\.me/.test(v)) return 'WhatsApp';
+      if (/tiktok\./.test(v)) return 'TikTok';
+      if (/youtube\.|youtu\.be/.test(v)) return 'YouTube';
+      if (/bing\./.test(v)) return 'Bing';
+      return s;
     }
 
     (function trackVisit() {
       if (!sbConfigured() || typeof fetch !== 'function') return;
-      try {
-        if (sbValidSession()) return;                  // don't count the owner
-        if (sessionStorage.getItem('cmViewSent')) return;   // once per session
-        sessionStorage.setItem('cmViewSent', '1');
-      } catch (err) {}
+      try { if (sbLSget(SB_SESSION_KEY)) return; } catch (err) {}   // never count the owner
 
-      var ua = navigator.userAgent || '';
-      var row = {
-        site: SITE_TAG,
-        visitor: visIdFrom(localStorage, 'cmVisitorId'),
-        session: visIdFrom(sessionStorage, 'cmSessionId'),
-        path: (location.pathname || '/') + (location.search || ''),
-        ref: visSource(document.referrer || ''),
-        device: visDevice(ua),
-        browser: visBrowser(ua),
-        lang: (navigator.language || '').slice(0, 12),
-        tz: ''
-      };
-      try { row.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (err) {}
+      var vid = '';
+      try { vid = localStorage.getItem('cheapMotorsVisitorId') || ''; } catch (err) {}
+      if (!vid) {
+        vid = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+        try { localStorage.setItem('cheapMotorsVisitorId', vid); } catch (err) {}
+      }
 
-      function send() {
-        fetch(SUPABASE_URL + '/rest/v1/' + VIEWS_TABLE, {
+      var base = { vid: vid, device: visDevice(navigator.userAgent || ''), source: String(visSourceHost()).slice(0, 80) };
+
+      function post(body) {
+        return fetch(SUPABASE_URL + '/rest/v1/' + VISITS_TABLE, {
           method: 'POST',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(row),
+          headers: Object.assign({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, sbAnonHeaders()),
+          body: JSON.stringify([body]),
           keepalive: true
-        }).catch(function () {});     // never let tracking break the page
+        });
+      }
+      function send() {
+        var withSite = {}; for (var k in base) withSite[k] = base[k];
+        withSite.site = SITE_TAG;
+        post(withSite).then(function (r) {
+          if (r && !r.ok) return post(base);     // older table without "site"
+        }).catch(function () {});                // fire and forget, never blocks the page
       }
       if (document.readyState === 'complete') send();
       else window.addEventListener('load', function () { setTimeout(send, 400); });
     })();
 
-
     /* =====================================================================
        VISITOR DASHBOARD
-       Reads page_views back for the owner. Reading requires the owner's
-       Supabase account (RLS allows select only to authenticated), so this
-       panel asks the owner to sign in before it shows anything.
+       Reads the shared "visits" table back for the owner. RLS allows select
+       only to an authenticated owner, so this asks for sign-in first.
        ===================================================================== */
     (function visitorDashboard() {
       var stateEl = document.getElementById('visState');
@@ -1295,8 +1274,9 @@
       if (!stateEl || !bodyEl) return;
 
       var rangeEl = document.getElementById('visRange');
+      var siteEl = document.getElementById('visSite');
       var refreshEl = document.getElementById('visRefresh');
-      var busy = false;
+      var busy = false, hasSiteCol = true;
 
       function show(msg) { stateEl.textContent = msg; stateEl.classList.remove('hidden'); bodyEl.classList.add('hidden'); }
       function showHTML(html) { stateEl.innerHTML = html; stateEl.classList.remove('hidden'); bodyEl.classList.add('hidden'); }
@@ -1306,19 +1286,15 @@
         if (!pairs.length) return '<p class="text-sm text-[#666]">No data yet.</p>';
         var max = Math.max.apply(null, pairs.map(function (p) { return p[1]; })) || 1;
         return pairs.map(function (p) {
-          var pct = Math.round(p[1] / max * 100);
           return '<div class="vis-row"><span class="vis-label">' + esc2(p[0]) + '</span>' +
-                 '<span class="vis-track"><span class="vis-fill" style="width:' + pct + '%;background:' + colour + '"></span></span>' +
+                 '<span class="vis-track"><span class="vis-fill" style="width:' + Math.round(p[1] / max * 100) + '%;background:' + colour + '"></span></span>' +
                  '<span class="vis-num">' + p[1] + '</span></div>';
         }).join('');
       }
-      function topPairs(rows, key, limit) {
-        var counts = {};
-        rows.forEach(function (r) {
-          var v = (r[key] || '').trim() || 'Unknown';
-          counts[v] = (counts[v] || 0) + 1;
-        });
-        return Object.keys(counts).map(function (k) { return [k, counts[k]]; })
+      function tally(rows, fn, limit) {
+        var c = {};
+        rows.forEach(function (r) { var v = fn(r) || 'Unknown'; c[v] = (c[v] || 0) + 1; });
+        return Object.keys(c).map(function (k) { return [k, c[k]]; })
           .sort(function (a, b) { return b[1] - a[1]; }).slice(0, limit || 6);
       }
       function ago(d) {
@@ -1330,22 +1306,26 @@
         if (days < 30) return days + (days === 1 ? ' day ago' : ' days ago');
         return d.toLocaleDateString();
       }
+      function siteName(v) {
+        if (!v) return 'cheap-motors.com';
+        return v === SITE_TAG ? 'This website' : v;
+      }
 
       function paint(rows) {
         var now = new Date();
         var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         var weekAgo = now.getTime() - 7 * 86400000;
 
-        var dated = rows.map(function (r) { var t = new Date(r.ts); return { r: r, t: t, ms: t.getTime() }; })
-                        .filter(function (x) { return !isNaN(x.ms); });
+        var dated = rows.map(function (r) { var t = new Date(r.created_at); return { r: r, t: t, ms: t.getTime() }; })
+                        .filter(function (x) { return !isNaN(x.ms); })
+                        .sort(function (a, b) { return b.ms - a.ms; });
 
         document.getElementById('visTotal').textContent = dated.length;
-        var uniq = {}; dated.forEach(function (x) { uniq[x.r.visitor || x.r.session || x.r.id] = 1; });
+        var uniq = {}; dated.forEach(function (x) { uniq[x.r.vid || x.r.id] = 1; });
         document.getElementById('visUnique').textContent = Object.keys(uniq).length;
         document.getElementById('visToday').textContent = dated.filter(function (x) { return x.ms >= startOfToday; }).length;
         document.getElementById('vis7').textContent = dated.filter(function (x) { return x.ms >= weekAgo; }).length;
 
-        /* ---- views per day, last 14 days ---- */
         var days = [], i;
         for (i = 13; i >= 0; i--) {
           var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
@@ -1358,38 +1338,44 @@
         });
         var peak = Math.max.apply(null, days.map(function (x) { return x.n; })) || 1;
         document.getElementById('visChart').innerHTML = days.map(function (x) {
-          var h = Math.max(3, Math.round(x.n / peak * 100));
           var label = x.d.getDate() + '/' + (x.d.getMonth() + 1);
           return '<div class="vis-col" title="' + label + ': ' + x.n + ' view' + (x.n === 1 ? '' : 's') + '">' +
                  '<span class="vis-colnum">' + (x.n || '') + '</span>' +
-                 '<span class="vis-colbar" style="height:' + h + '%"></span>' +
+                 '<span class="vis-colbar" style="height:' + Math.max(3, Math.round(x.n / peak * 100)) + '%"></span>' +
                  '<span class="vis-colday">' + x.d.getDate() + '</span></div>';
         }).join('');
 
-        document.getElementById('visSources').innerHTML = bars(topPairs(rows, 'ref', 6), '#D4AF37');
-        document.getElementById('visDevices').innerHTML = bars(topPairs(rows, 'device', 4), '#4ade80');
+        document.getElementById('visSources').innerHTML =
+          bars(tally(rows, function (r) { return visPrettySource(r.source); }, 6), '#D4AF37');
+        document.getElementById('visDevices').innerHTML =
+          bars(tally(rows, function (r) { return r.device || 'Visitor'; }, 5), '#4ade80');
+        document.getElementById('visHours').innerHTML =
+          bars(tally(dated, function (x) { var hh = x.t.getHours(); return (hh < 10 ? '0' : '') + hh + ':00'; }, 5), '#60a5fa');
 
-        var hourCounts = {};
-        dated.forEach(function (x) { var hh = x.t.getHours(); hourCounts[hh] = (hourCounts[hh] || 0) + 1; });
-        var hourPairs = Object.keys(hourCounts).map(function (k) {
-          var hh = Number(k);
-          return [(hh < 10 ? '0' : '') + hh + ':00', hourCounts[k]];
-        }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
-        document.getElementById('visHours').innerHTML = bars(hourPairs, '#60a5fa');
-
-        /* ---- recent visits ---- */
         var recent = dated.slice(0, 25);
         document.getElementById('visRecent').innerHTML = recent.length
-          ? '<table class="vis-table"><thead><tr><th>When</th><th>Source</th><th>Device</th><th>Browser</th><th>Page</th></tr></thead><tbody>' +
+          ? '<table class="vis-table"><thead><tr><th>When</th><th>Source</th><th>Device</th><th>Visitor</th>' +
+            (hasSiteCol ? '<th>Website</th>' : '') + '</tr></thead><tbody>' +
             recent.map(function (x) {
-              return '<tr><td>' + esc2(ago(x.t)) + '</td><td>' + esc2(x.r.ref || 'Direct') + '</td><td>' +
-                     esc2(x.r.device || '—') + '</td><td>' + esc2(x.r.browser || '—') + '</td><td>' +
-                     esc2(x.r.path || '/') + '</td></tr>';
+              return '<tr><td>' + esc2(ago(x.t)) + '</td><td>' + esc2(visPrettySource(x.r.source)) +
+                     '</td><td>' + esc2(x.r.device || 'Visitor') + '</td><td>' +
+                     esc2(String(x.r.vid || '—').slice(0, 8)) + '</td>' +
+                     (hasSiteCol ? '<td>' + esc2(siteName(x.r.site)) + '</td>' : '') + '</tr>';
             }).join('') + '</tbody></table>'
-          : '<p class="text-sm text-[#666]">No visits recorded yet.</p>';
+          : '<p class="text-sm text-[#666]">No visits recorded yet. Open the website in another browser and press Refresh.</p>';
 
         stateEl.classList.add('hidden');
         bodyEl.classList.remove('hidden');
+      }
+
+      function buildUrl(withSite) {
+        var days = rangeEl ? Number(rangeEl.value) : 30;
+        var cols = 'id,created_at,vid,device,source' + (withSite ? ',site' : '');
+        var url = SUPABASE_URL + '/rest/v1/' + VISITS_TABLE + '?select=' + cols + '&order=created_at.desc&limit=5000';
+        if (days > 0) url += '&created_at=gte.' + new Date(Date.now() - days * 86400000).toISOString();
+        if (withSite && siteEl && siteEl.value === 'this') url += '&site=eq.' + encodeURIComponent(SITE_TAG);
+        if (withSite && siteEl && siteEl.value === 'other') url += '&or=(site.is.null,site.neq.' + encodeURIComponent(SITE_TAG) + ')';
+        return url;
       }
 
       function load() {
@@ -1402,33 +1388,35 @@
         busy = true;
         show('Loading visitor data…');
 
-        var days = rangeEl ? Number(rangeEl.value) : 30;
-        var url = SUPABASE_URL + '/rest/v1/' + VIEWS_TABLE +
-                  '?select=id,ts,visitor,session,path,ref,device,browser&order=ts.desc&limit=5000';
-        if (days > 0) {
-          url += '&ts=gte.' + new Date(Date.now() - days * 86400000).toISOString();
+        function run(withSite) {
+          return sbAuthedFetch(buildUrl(withSite), { headers: { 'Accept': 'application/json' } })
+            .then(function (res) {
+              if (!res) { busy = false; show('Could not reach the cloud. Check your connection and press Refresh.'); return; }
+              if (res.status === 400 && withSite) {        // table has no "site" column yet
+                hasSiteCol = false;
+                if (siteEl) siteEl.classList.add('hidden');
+                return run(false);
+              }
+              busy = false;
+              if (res.status === 404) {
+                showHTML('Visitor counting is not set up yet.<br><span class="text-[#888]">Open Supabase → SQL Editor and run <b>supabase-visits-setup.sql</b> from your repository, then press Refresh.</span>');
+                return;
+              }
+              if (res.status === 401 || res.status === 403) {
+                show('Your owner session has expired. Sign in again with the cloud button, then press Refresh.');
+                return;
+              }
+              if (!res.ok) { show('Could not load visitor data (error ' + res.status + ').'); return; }
+              return res.json().then(paint);
+            })
+            .catch(function () { busy = false; show('Could not load visitor data. Press Refresh to try again.'); });
         }
-        sbAuthedFetch(url, { headers: { 'Accept': 'application/json' } })
-          .then(function (res) {
-            busy = false;
-            if (!res) { show('Could not reach the cloud. Check your connection and try Refresh.'); return null; }
-            if (res.status === 404 || res.status === 400) {
-              showHTML('Visitor tracking is not set up yet.<br><span class="text-[#888]">Open Supabase → SQL Editor and run the script in <b>analytics-setup.sql</b> from your repository, then press Refresh.</span>');
-              return null;
-            }
-            if (res.status === 401 || res.status === 403) {
-              show('Your owner session has expired. Sign in again with the cloud button, then press Refresh.');
-              return null;
-            }
-            if (!res.ok) { show('Could not load visitor data (error ' + res.status + ').'); return null; }
-            return res.json();
-          })
-          .then(function (rows) { if (rows) paint(rows); })
-          .catch(function () { busy = false; show('Could not load visitor data. Press Refresh to try again.'); });
+        run(hasSiteCol);
       }
 
       if (refreshEl) refreshEl.addEventListener('click', load);
       if (rangeEl) rangeEl.addEventListener('change', load);
+      if (siteEl) siteEl.addEventListener('change', load);
       window.cmVisitorsRefresh = load;
     })();
 
