@@ -22,6 +22,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 const SITE = 'https://www.ssenyonga-motors.online';
+const GOOGLE_VERIFICATION = 'AUZAVdKut9N4cSCUyePla4p6Sv3R1Jm545pBSgeb0CI';   // Search Console: metadata.verification.google
 const SUPABASE_URL = 'https://araestfegjfgbpiuqiay.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_y_jcJfz8cP3hUP794i8dtQ_9XPbgnAt';
 const PHONE_DISPLAY = '0753 825 453';
@@ -67,6 +68,7 @@ function page({ title, description, canonical, h1, intro, body, jsonld }) {
 <meta property="og:url" content="${esc(canonical)}">
 <meta property="og:site_name" content="${esc(BRAND)}">
 <meta name="theme-color" content="#111111">
+<meta name="google-site-verification" content="${GOOGLE_VERIFICATION}">
 <style>
 *,::before,::after{box-sizing:border-box}
 body{margin:0;background:#111;color:#eee;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.6}
